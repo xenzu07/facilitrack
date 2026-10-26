@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  REPORTER
+  TECHNICIAN
+  COORDINATOR
+  ADMIN
+}
+
+enum Urgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Status {
+  SUBMITTED
+  UNDER_REVIEW
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id           String     @id @default(uuid())
+  fullName     String
+  email        String     @unique
+  passwordHash String
+  role         Role
+  userType     String?
+  isActive     Boolean    @default(true)
+  tradeUnitId  String?
+  tradeUnit    TradeUnit? @relation(fields: [tradeUnitId], references: [id])
+  reports      Report[]   @relation("Reporter")
+  jobs         JobOrder[] @relation("Technician")
+}
+
+model TradeUnit {
+  id         String          @id @default(uuid())
+  name       String          @unique
+  users      User[]
+  categories IssueCategory[]
+  jobOrders  JobOrder[]
+  reports    Report[]
+}
+
+model IssueCategory {
+  id                 String    @id @default(uuid())
+  name               String    @unique
+  defaultTradeUnitId String
+  defaultTradeUnit   TradeUnit @relation(fields: [defaultTradeUnitId], references: [id])
+  reports            Report[]
+}
+
+model Location {
+  id       String   @id @default(uuid())
+  building String
+  floor    String
+  room     String
+  reports  Report[]
+
+  @@unique([building, floor, room])
+}
+
+model Report {
+  id                  String        @id @default(uuid())
+  reporterId          String
+  reporter            User          @relation("Reporter", fields: [reporterId], references: [id])
+  locationId          String
+  location            Location      @relation(fields: [locationId], references: [id])
+  categoryId          String
+  category            IssueCategory @relation(fields: [categoryId], references: [id])
+  proposedTradeUnitId String
+  proposedTradeUnit   TradeUnit     @relation(fields: [proposedTradeUnitId], references: [id])
+  description         String
+  urgency             Urgency
+  status              Status        @default(SUBMITTED)
+  createdAt           DateTime      @default(now())
+  photos              ReportPhoto[]
+  jobOrder            JobOrder?
+  logs                StatusLog[]
+}
+
+model ReportPhoto {
+  id         String @id @default(uuid())
+  reportId   String
+  report     Report @relation(fields: [reportId], references: [id])
+  storageUrl String
+}
+
+model JobOrder {
+  id            String    @id @default(uuid())
+  jobOrderNo    String    @unique
+  reportId      String    @unique
+  report        Report    @relation(fields: [reportId], references: [id])
+  tradeUnitId   String
+  tradeUnit     TradeUnit @relation(fields: [tradeUnitId], references: [id])
+  technicianId  String?
+  technician    User?     @relation("Technician", fields: [technicianId], references: [id])
+  materialsNote String?
+  targetDate    DateTime?
+  status        Status    @default(ASSIGNED)
+  createdById   String
+  createdAt     DateTime  @default(now())
+}
+
+model StatusLog {
+  id          String   @id @default(uuid())
+  reportId    String
+  report      Report   @relation(fields: [reportId], references: [id])
+  oldStatus   Status?
+  newStatus   Status
+  remarks     String?
+  changedById String
+  createdAt   DateTime @default(now())
+}
