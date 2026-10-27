@@ -171,12 +171,22 @@ export class JobOrdersService {
   }
 
   async assignTechnician(id: string, userId: string, dto: AssignTechnicianDto) {
-    const job = await this.prisma.jobOrder.findUnique({ where: { id } });
+    const job = await this.prisma.jobOrder.findUnique({
+      where: { id },
+      include: { technician: { select: { id: true, fullName: true } } },
+    });
     if (!job) throw new NotFoundException('Job order not found');
     if (job.status !== Status.ASSIGNED) {
       throw new BadRequestException('Technician can only be changed before work starts');
     }
+    if (job.technicianId === dto.technicianId) {
+      throw new BadRequestException('This technician is already assigned to the job');
+    }
     const tech = await this.assertTechnician(dto.technicianId, job.tradeUnitId);
+
+    const remarks = job.technician
+      ? `Technician reassigned from ${job.technician.fullName} to ${tech.fullName}`
+      : `Technician assigned: ${tech.fullName}`;
 
     return this.prisma.$transaction(async (tx) => {
       await tx.jobOrder.update({
@@ -188,7 +198,7 @@ export class JobOrdersService {
           reportId: job.reportId,
           oldStatus: Status.ASSIGNED,
           newStatus: Status.ASSIGNED,
-          remarks: `Technician assigned: ${tech.fullName}`,
+          remarks,
           changedById: userId,
         },
       });

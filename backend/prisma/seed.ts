@@ -51,7 +51,9 @@ async function main() {
     { fullName: 'GSO Coordinator', email: 'coordinator@test.com', role: 'COORDINATOR' },
     { fullName: 'Campus Admin', email: 'admin@test.com', role: 'ADMIN' },
     { fullName: 'Plumber One', email: 'plumber@test.com', role: 'TECHNICIAN', unit: 'Plumbing' },
+    { fullName: 'Plumber Two', email: 'plumber2@test.com', role: 'TECHNICIAN', unit: 'Plumbing' },
     { fullName: 'Electrician One', email: 'electrician@test.com', role: 'TECHNICIAN', unit: 'Electrical' },
+    { fullName: 'Electrician Two', email: 'electrician2@test.com', role: 'TECHNICIAN', unit: 'Electrical' },
   ];
   for (const u of users) {
     await prisma.user.upsert({
