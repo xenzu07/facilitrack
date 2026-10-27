@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_client.dart';
 import '../../core/nav.dart';
+import '../../core/realtime.dart';
 
 class AuthUser {
   final String id;
@@ -31,6 +32,7 @@ class AuthProvider extends ChangeNotifier {
     final saved = prefs.getString('user');
     if (token != null && saved != null) {
       ApiClient.instance.token = token;
+      Realtime.instance.connect();
       user = AuthUser.fromJson(jsonDecode(saved));
     }
     loading = false;
@@ -48,11 +50,13 @@ class AuthProvider extends ChangeNotifier {
     await prefs.setString('user', jsonEncode(u.toJson()));
 
     ApiClient.instance.token = token;
+    Realtime.instance.connect();
     user = u;
     notifyListeners();
   }
 
   Future<void> logout() async {
+    Realtime.instance.disconnect();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     await prefs.remove('user');

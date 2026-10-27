@@ -5,6 +5,8 @@ import '../../core/format.dart';
 import '../auth/auth_provider.dart';
 import 'create_report_screen.dart';
 import 'report_detail_screen.dart';
+import 'dart:async';
+import '../../core/realtime.dart';
 
 class MyReportsScreen extends StatefulWidget {
   const MyReportsScreen({super.key});
@@ -17,23 +19,36 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
   List<dynamic> reports = [];
   bool loading = true;
   String? error;
+  StreamSubscription<Map<String, dynamic>>? _sub;
 
   @override
   void initState() {
     super.initState();
     load();
+    _sub = Realtime.instance.events.listen((_) {
+      if (mounted) load(silent: true);
+    });
   }
 
-  Future<void> load() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        loading = true;
+        error = null;
+      });
+    }
     try {
       final res = await ApiClient.instance.dio.get('/reports/mine');
       reports = res.data as List;
+      error = null;
     } catch (e) {
-      error = errorMessage(e);
+      if (!silent) error = errorMessage(e);
     }
     if (mounted) setState(() => loading = false);
   }

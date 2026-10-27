@@ -1,8 +1,10 @@
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './auth';
+import { useLiveStatus } from './socket';
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const live = useLiveStatus();
   if (!user) return <Navigate to="/login" replace />;
 
   return (
@@ -16,6 +18,10 @@ export default function Layout() {
           <NavLink to="/job-orders">Job orders</NavLink>
         </nav>
         <div className="user">
+          <span className="live">
+            <span className={`dot ${live ? 'on' : ''}`} />
+            {live ? 'Live' : 'Offline'}
+          </span>
           {user.fullName}
           <button className="btn btn-ghost" onClick={logout}>
             Sign out

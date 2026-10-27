@@ -10,6 +10,7 @@ import {
 } from '../format';
 import { ErrorBox, StatusBadge } from '../ui';
 import type { JobOrder, Status } from '../types';
+import { useRealtime } from '../socket';
 
 export default function JobOrdersPage() {
   const [jobs, setJobs] = useState<JobOrder[]>([]);
@@ -34,6 +35,10 @@ export default function JobOrdersPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtime(() => {
+    void load();
+  });
 
   return (
     <div>

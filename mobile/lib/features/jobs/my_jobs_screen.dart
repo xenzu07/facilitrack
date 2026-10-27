@@ -4,6 +4,8 @@ import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../auth/auth_provider.dart';
 import 'job_detail_screen.dart';
+import 'dart:async';
+import '../../core/realtime.dart';
 
 class MyJobsScreen extends StatefulWidget {
   const MyJobsScreen({super.key});
@@ -16,18 +18,30 @@ class _MyJobsScreenState extends State<MyJobsScreen> {
   List<dynamic> jobs = [];
   bool loading = true;
   String? error;
+  StreamSubscription<Map<String, dynamic>>? _sub;
 
   @override
   void initState() {
     super.initState();
     load();
+    _sub = Realtime.instance.events.listen((_) {
+      if (mounted) load(silent: true);
+    });
   }
 
-  Future<void> load() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        loading = true;
+        error = null;
+      });
+    }
     try {
       final res = await ApiClient.instance.dio.get('/job-orders/assigned');
       final list = List<dynamic>.from(res.data as List);
@@ -36,8 +50,9 @@ class _MyJobsScreenState extends State<MyJobsScreen> {
       list.sort((a, b) =>
           (order[a['status']] ?? 9).compareTo(order[b['status']] ?? 9));
       jobs = list;
+      error = null;
     } catch (e) {
-      error = errorMessage(e);
+      if (!silent) error = errorMessage(e);
     }
     if (mounted) setState(() => loading = false);
   }

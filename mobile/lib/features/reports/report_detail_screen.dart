@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/config.dart';
 import '../../core/format.dart';
+import 'dart:async';
+import '../../core/realtime.dart';
 
 class ReportDetailScreen extends StatefulWidget {
   final String reportId;
@@ -15,24 +17,37 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   Map<String, dynamic>? report;
   bool loading = true;
   String? error;
+  StreamSubscription<Map<String, dynamic>>? _sub;
 
   @override
   void initState() {
     super.initState();
     load();
+    _sub = Realtime.instance.events.listen((e) {
+      if (mounted && e['reportId'] == widget.reportId) load(silent: true);
+    });
   }
 
-  Future<void> load() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        loading = true;
+        error = null;
+      });
+    }
     try {
       final res =
           await ApiClient.instance.dio.get('/reports/${widget.reportId}');
       report = Map<String, dynamic>.from(res.data);
+      error = null;
     } catch (e) {
-      error = errorMessage(e);
+      if (!silent) error = errorMessage(e);
     }
     if (mounted) setState(() => loading = false);
   }

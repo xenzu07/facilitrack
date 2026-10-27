@@ -10,6 +10,7 @@ import type {
   Technician,
   TradeUnit,
 } from '../types';
+import { useRealtime } from '../socket';
 
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -52,6 +53,10 @@ export default function ReportDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtime((e) => {
+    if (e.reportId === id) void load();
+  });
 
   if (loading) return <p className="muted">Loading...</p>;
   if (error || !report) {

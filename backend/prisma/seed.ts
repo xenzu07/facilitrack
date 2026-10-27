@@ -54,6 +54,8 @@ async function main() {
     { fullName: 'Plumber Two', email: 'plumber2@test.com', role: 'TECHNICIAN', unit: 'Plumbing' },
     { fullName: 'Electrician One', email: 'electrician@test.com', role: 'TECHNICIAN', unit: 'Electrical' },
     { fullName: 'Electrician Two', email: 'electrician2@test.com', role: 'TECHNICIAN', unit: 'Electrical' },
+    { fullName: 'Mechanic One', email: 'mechanic@test.com', role: 'TECHNICIAN', unit: 'Mechanical' },
+    { fullName: 'Painter One', email: 'painter@test.com', role: 'TECHNICIAN', unit: 'Painting' },
   ];
   for (const u of users) {
     await prisma.user.upsert({

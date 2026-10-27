@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/config.dart';
 import '../../core/format.dart';
+import 'dart:async';
+import '../../core/realtime.dart';
 
 class JobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -18,28 +20,37 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   String? error;
   final remarksCtrl = TextEditingController();
 
+  StreamSubscription<Map<String, dynamic>>? _sub;
+
   @override
   void initState() {
     super.initState();
     load();
+    _sub = Realtime.instance.events.listen((e) {
+      if (mounted && e['jobOrderId'] == widget.jobId) load(silent: true);
+    });
   }
 
   @override
   void dispose() {
+    _sub?.cancel();
     remarksCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> load() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
+  Future<void> load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        loading = true;
+        error = null;
+      });
+    }
     try {
       final res = await ApiClient.instance.dio.get('/job-orders/${widget.jobId}');
       job = Map<String, dynamic>.from(res.data);
+      error = null;
     } catch (e) {
-      error = errorMessage(e);
+      if (!silent) error = errorMessage(e);
     }
     if (mounted) setState(() => loading = false);
   }

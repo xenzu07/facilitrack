@@ -11,6 +11,7 @@ import {
 } from '../format';
 import { ErrorBox, StatusBadge, UrgencyBadge } from '../ui';
 import type { Report, ReportOptions, Status, Urgency } from '../types';
+import { useRealtime } from '../socket';
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -41,6 +42,10 @@ export default function ReportsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useRealtime(() => {
+    void load();
+  });
 
   const counts = useMemo(() => {
     const c: Record<Status, number> = {

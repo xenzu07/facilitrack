@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from 'react';
 import { api, setUnauthorizedHandler, TOKEN_KEY, USER_KEY } from './api';
 import type { Role } from './types';
+import { closeSocket } from './socket';
 
 export interface AuthUser {
   id: string;
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(readStoredUser);
 
   const logout = useCallback(() => {
+    closeSocket();
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
     setUser(null);

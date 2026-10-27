@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobOrderDto } from './dto/create-job-order.dto';
 import { UpdateJobStatusDto } from './dto/update-job-status.dto';
 import { AssignTechnicianDto } from './dto/assign-technician.dto';
+import { EventsGateway } from '../events/events.gateway';
 
 const jobInclude = {
   tradeUnit: true,
@@ -32,7 +33,7 @@ const NEXT_STATUS: Partial<Record<Status, Status[]>> = {
 
 @Injectable()
 export class JobOrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private events: EventsGateway) {}
 
   private async assertTechnician(technicianId: string, tradeUnitId: string) {
     const tech = await this.prisma.user.findUnique({ where: { id: technicianId } });
@@ -83,7 +84,7 @@ export class JobOrdersService {
     // retry if two coordinators generate a number at the same moment
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        return await this.prisma.$transaction(async (tx) => {
+        const created = await this.prisma.$transaction(async (tx) => {
           const prefix = `JO-${new Date().getFullYear()}-`;
           const last = await tx.jobOrder.findFirst({
             where: { jobOrderNo: { startsWith: prefix } },
@@ -126,6 +127,19 @@ export class JobOrdersService {
             include: jobInclude,
           });
         });
+
+        if (created) {
+          this.events.statusChanged(
+            {
+              reportId: report.id,
+              jobOrderId: created.id,
+              status: Status.ASSIGNED,
+              message: `Job order ${created.jobOrderNo} created`,
+            },
+            [report.reporterId, tech?.id],
+          );
+        }
+        return created;
       } catch (e) {
         const isCollision =
           e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
@@ -173,7 +187,10 @@ export class JobOrdersService {
   async assignTechnician(id: string, userId: string, dto: AssignTechnicianDto) {
     const job = await this.prisma.jobOrder.findUnique({
       where: { id },
-      include: { technician: { select: { id: true, fullName: true } } },
+      include: {
+        technician: { select: { id: true, fullName: true } },
+        report: { select: { reporterId: true } },
+      },
     });
     if (!job) throw new NotFoundException('Job order not found');
     if (job.status !== Status.ASSIGNED) {
@@ -188,7 +205,7 @@ export class JobOrdersService {
       ? `Technician reassigned from ${job.technician.fullName} to ${tech.fullName}`
       : `Technician assigned: ${tech.fullName}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       await tx.jobOrder.update({
         where: { id },
         data: { technicianId: tech.id },
@@ -204,10 +221,25 @@ export class JobOrdersService {
       });
       return tx.jobOrder.findUnique({ where: { id }, include: jobInclude });
     });
+
+    // the previous technician is notified too, so the job leaves their list
+    this.events.statusChanged(
+      {
+        reportId: job.reportId,
+        jobOrderId: id,
+        status: Status.ASSIGNED,
+        message: remarks,
+      },
+      [job.report.reporterId, tech.id, job.technicianId],
+    );
+    return updated;
   }
 
   async updateStatus(id: string, userId: string, dto: UpdateJobStatusDto) {
-    const job = await this.prisma.jobOrder.findUnique({ where: { id } });
+    const job = await this.prisma.jobOrder.findUnique({
+      where: { id },
+      include: { report: { select: { reporterId: true } } },
+    });
     if (!job) throw new NotFoundException('Job order not found');
     if (job.technicianId !== userId) {
       throw new ForbiddenException('This job is not assigned to you');
@@ -220,7 +252,7 @@ export class JobOrdersService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       await tx.jobOrder.update({ where: { id }, data: { status: dto.status } });
       await tx.report.update({
         where: { id: job.reportId },
@@ -237,5 +269,18 @@ export class JobOrdersService {
       });
       return tx.jobOrder.findUnique({ where: { id }, include: jobInclude });
     });
+
+    this.events.statusChanged(
+      {
+        reportId: job.reportId,
+        jobOrderId: id,
+        status: dto.status,
+        message: `${job.jobOrderNo} is now ${
+          dto.status === Status.IN_PROGRESS ? 'in progress' : 'completed'
+        }`,
+      },
+      [job.report.reporterId, job.technicianId],
+    );
+    return updated;
   }
 }

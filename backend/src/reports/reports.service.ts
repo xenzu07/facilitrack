@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
 import { RouteReportDto } from './dto/route-report.dto';
+import { EventsGateway } from '../events/events.gateway';
 
 const reportInclude = {
   category: true,
@@ -22,7 +23,7 @@ const reportInclude = {
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private events: EventsGateway) {}
 
   // dropdown data for the mobile report form
   async options() {
@@ -53,7 +54,7 @@ export class ReportsService {
     });
     if (!location) throw new NotFoundException('Location not found');
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const report = await tx.report.create({
         data: {
           reporterId: userId,
@@ -81,6 +82,19 @@ export class ReportsService {
         include: reportInclude,
       });
     });
+
+    if (created) {
+      this.events.statusChanged(
+        {
+          reportId: created.id,
+          jobOrderId: null,
+          status: Status.SUBMITTED,
+          message: 'New report submitted',
+        },
+        [userId],
+      );
+    }
+    return created;
   }
 
   // coordinator confirms or changes the proposed trade unit
@@ -110,7 +124,7 @@ export class ReportsService {
       ? `Routing to ${unit.name} confirmed`
       : `Reassigned from ${report.proposedTradeUnit.name} to ${unit.name}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       await tx.report.update({
         where: { id },
         data: { proposedTradeUnitId: unit.id, status: Status.UNDER_REVIEW },
@@ -126,6 +140,12 @@ export class ReportsService {
       });
       return tx.report.findUnique({ where: { id }, include: reportInclude });
     });
+
+    this.events.statusChanged(
+      { reportId: id, jobOrderId: null, status: Status.UNDER_REVIEW, message: note },
+      [report.reporterId],
+    );
+    return updated;
   }
 
   findMine(userId: string) {
