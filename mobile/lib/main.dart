@@ -5,6 +5,7 @@ import 'features/auth/auth_provider.dart';
 import 'features/auth/login_screen.dart';
 import 'features/home/placeholder_home.dart';
 import 'features/reports/my_reports_screen.dart';
+import 'features/jobs/my_jobs_screen.dart';
 
 void main() {
   runApp(
@@ -50,10 +51,7 @@ class Gate extends StatelessWidget {
       case 'REPORTER':
         return const MyReportsScreen();
       case 'TECHNICIAN':
-        return const PlaceholderHome(
-          title: 'My Jobs',
-          message: 'Technician job screens are built in the next hour.',
-        );
+        return const MyJobsScreen();
       default:
         return const PlaceholderHome(
           title: 'Administration',
