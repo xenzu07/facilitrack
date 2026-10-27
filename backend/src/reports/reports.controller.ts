@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -23,6 +24,7 @@ import { Roles } from '../auth/roles.decorator';
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
+import { RouteReportDto } from './dto/route-report.dto';
 
 const UPLOAD_DIR = 'uploads';
 if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -79,6 +81,16 @@ export class ReportsController {
   @Get()
   list(@Query() filters: ListReportsDto) {
     return this.reports.findAll(filters);
+  }
+  
+  @Roles(Role.COORDINATOR, Role.ADMIN)
+  @Patch(':id/route')
+  route(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: any,
+    @Body() dto: RouteReportDto,
+  ) {
+    return this.reports.routeReport(id, req.user.userId, dto);
   }
 
   @Get(':id')

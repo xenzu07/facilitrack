@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,6 +8,7 @@ import { Prisma, Role, Status, Urgency } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
+import { RouteReportDto } from './dto/route-report.dto';
 
 const reportInclude = {
   category: true,
@@ -78,6 +80,40 @@ export class ReportsService {
         where: { id: report.id },
         include: reportInclude,
       });
+    });
+  }
+
+  // coordinator confirms or changes the proposed trade unit
+  async routeReport(id: string, userId: string, dto: RouteReportDto) {
+    const report = await this.prisma.report.findUnique({
+      where: { id },
+      include: { jobOrder: true },
+    });
+    if (!report) throw new NotFoundException('Report not found');
+    if (report.jobOrder) {
+      throw new BadRequestException('A job order already exists for this report');
+    }
+
+    const unit = await this.prisma.tradeUnit.findUnique({
+      where: { id: dto.tradeUnitId },
+    });
+    if (!unit) throw new NotFoundException('Trade unit not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.report.update({
+        where: { id },
+        data: { proposedTradeUnitId: unit.id, status: Status.UNDER_REVIEW },
+      });
+      await tx.statusLog.create({
+        data: {
+          reportId: id,
+          oldStatus: report.status,
+          newStatus: Status.UNDER_REVIEW,
+          remarks: dto.remarks ?? `Routed to ${unit.name}`,
+          changedById: userId,
+        },
+      });
+      return tx.report.findUnique({ where: { id }, include: reportInclude });
     });
   }
 
