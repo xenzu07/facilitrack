@@ -87,7 +87,7 @@ export class ReportsService {
   async routeReport(id: string, userId: string, dto: RouteReportDto) {
     const report = await this.prisma.report.findUnique({
       where: { id },
-      include: { jobOrder: true },
+      include: { jobOrder: true, proposedTradeUnit: true },
     });
     if (!report) throw new NotFoundException('Report not found');
     if (report.jobOrder) {
@@ -99,6 +99,17 @@ export class ReportsService {
     });
     if (!unit) throw new NotFoundException('Trade unit not found');
 
+    const sameUnit = report.proposedTradeUnitId === unit.id;
+
+    // nothing changed: don't write a duplicate log entry
+    if (sameUnit && report.status === Status.UNDER_REVIEW) {
+      return this.prisma.report.findUnique({ where: { id }, include: reportInclude });
+    }
+
+    const note = sameUnit
+      ? `Routing to ${unit.name} confirmed`
+      : `Reassigned from ${report.proposedTradeUnit.name} to ${unit.name}`;
+
     return this.prisma.$transaction(async (tx) => {
       await tx.report.update({
         where: { id },
@@ -109,7 +120,7 @@ export class ReportsService {
           reportId: id,
           oldStatus: report.status,
           newStatus: Status.UNDER_REVIEW,
-          remarks: dto.remarks ?? `Routed to ${unit.name}`,
+          remarks: dto.remarks ? `${note}: ${dto.remarks}` : note,
           changedById: userId,
         },
       });
