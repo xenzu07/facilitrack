@@ -40,11 +40,20 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
-uploads/
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
+
+# others
+*.env
+node_modules/
+dist/
+uploads/
+build/
+.dart_tool/
+.idea/
+.vscode/
 
 # temp directory
 .temp
